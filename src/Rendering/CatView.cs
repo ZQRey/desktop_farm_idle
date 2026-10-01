@@ -22,7 +22,7 @@ public partial class CatView : Node2D
             Position = new Vector2(0, 0)
         };
         AddChild(_catSprite);
-        Position = new Vector2(_catX, 142.0f);
+        Position = new Vector2(_catX, 156.0f);
     }
 
     public override void _Process(double delta)
@@ -48,16 +48,16 @@ public partial class CatView : Node2D
             _catX += _catDir * 18.0f * dt;
             _catX = Math.Clamp(_catX, 300.0f, 1700.0f);
 
-            Position = new Vector2(_catX, 142.0f + MathF.Sin(_walkTimer) * 1.0f);
+            Position = new Vector2(_catX, 156.0f + MathF.Sin(_walkTimer) * 1.0f);
             Scale = new Vector2(_catDir > 0 ? -1.0f : 1.0f, 1.0f);
         }
         else if (_catState == 1) // Watch tractor
         {
-            Position = new Vector2(_catX, 143.0f);
+            Position = new Vector2(_catX, 156.0f);
         }
         else // Resting
         {
-            Position = new Vector2(_catX, 145.0f);
+            Position = new Vector2(_catX, 157.0f);
         }
     }
 }

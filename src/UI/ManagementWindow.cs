@@ -1,6 +1,7 @@
 using System;
 using Godot;
 using DesktopFarmIdle.Core.Config;
+using DesktopFarmIdle.DesktopIntegration;
 using DesktopFarmIdle.Simulation;
 using DesktopFarmIdle.Simulation.Vehicles;
 
@@ -14,10 +15,12 @@ public partial class ManagementWindow : Window
     private Label? _lblBalance;
     private Label? _lblStorage;
     private Label? _lblCropStatus;
+    private Label? _lblTractorStatus;
     private CheckBox? _chkAutoPlow;
     private CheckBox? _chkAutoSow;
     private CheckBox? _chkAutoHarvest;
     private CheckBox? _chkAutoRefuel;
+    private SpinBox? _spinHeight;
 
     public void BindSimulation(GameSimulation simulation)
     {
@@ -27,9 +30,9 @@ public partial class ManagementWindow : Window
 
     public override void _Ready()
     {
-        Title = "🌾 Desktop Farm Idle — Management Control";
-        Size = new Vector2I(820, 520);
-        Position = new Vector2I(150, 150);
+        Title = "🌾 Desktop Farm Idle — Управление фермой";
+        Size = new Vector2I(840, 540);
+        Position = new Vector2I(200, 200);
         Exclusive = false;
         Transient = false;
         Visible = false;
@@ -37,6 +40,13 @@ public partial class ManagementWindow : Window
         CloseRequested += () => Hide();
 
         BuildInterface();
+    }
+
+    public void Open()
+    {
+        RefreshUI();
+        Show();
+        GrabFocus();
     }
 
     private void BuildInterface()
@@ -50,25 +60,25 @@ public partial class ManagementWindow : Window
 
         var vbox = new VBoxContainer
         {
-            CustomMinimumSize = new Vector2(800, 500)
+            CustomMinimumSize = new Vector2(820, 520)
         };
         rootPanel.AddChild(vbox);
 
         // Header bar
         var header = new HBoxContainer();
-        _lblBalance = new Label { Text = "💰 Balance: 500 Coins" };
+        _lblBalance = new Label { Text = "💰 Баланс: 500 Монет" };
         _lblBalance.AddThemeFontSizeOverride("font_size", 16);
         header.AddChild(_lblBalance);
 
         header.AddChild(new VSeparator());
 
-        _lblStorage = new Label { Text = "🏚️ Silo: 0.0 / 25.0 t" };
+        _lblStorage = new Label { Text = "🏚️ Элеватор: 0.0 / 25.0 т" };
         _lblStorage.AddThemeFontSizeOverride("font_size", 16);
         header.AddChild(_lblStorage);
 
         header.AddChild(new VSeparator());
 
-        _lblCropStatus = new Label { Text = "🌾 Wheat: Growing (45%)" };
+        _lblCropStatus = new Label { Text = "🌾 Пшеница: Рост (45%)" };
         _lblCropStatus.AddThemeFontSizeOverride("font_size", 16);
         header.AddChild(_lblCropStatus);
 
@@ -86,22 +96,28 @@ public partial class ManagementWindow : Window
         BuildMachineryTab();
         BuildMarketTab();
         BuildAutomationTab();
+        BuildSettingsTab();
         BuildDevTab();
     }
 
     private void BuildDashboardTab()
     {
-        var dash = new VBoxContainer { Name = "📊 Dashboard" };
+        var dash = new VBoxContainer { Name = "📊 Дашборд" };
 
         var lblWelcome = new Label
         {
-            Text = "Welcome to Desktop Farm Idle!\nYour autonomous ambient farm operates quietly while you work."
+            Text = "Добро пожаловать в Desktop Farm Idle!\nСпокойная idle-ферма живёт на рабочем столе и самостоятельно выполняет работы."
         };
         dash.AddChild(lblWelcome);
 
         dash.AddChild(new HSeparator());
 
-        var btnSellAll = new Button { Text = "💰 Sell All Stored Crops at Market Value" };
+        _lblTractorStatus = new Label { Text = "🚜 Состояние техники: Отличное | Топливо: 100%" };
+        dash.AddChild(_lblTractorStatus);
+
+        dash.AddChild(new HSeparator());
+
+        var btnSellAll = new Button { Text = "💰 Продать весь урожай со склада по текущей рыночной цене" };
         btnSellAll.Pressed += () =>
         {
             if (_simulation != null)
@@ -117,12 +133,12 @@ public partial class ManagementWindow : Window
 
     private void BuildMachineryTab()
     {
-        var mach = new VBoxContainer { Name = "🚜 Machinery" };
+        var mach = new VBoxContainer { Name = "🚜 Техника" };
 
-        var lblInfo = new Label { Text = "Farm Fleet Status & Workshop Maintenance:" };
+        var lblInfo = new Label { Text = "Парк сельхозтехники и мастерская обслуживания:" };
         mach.AddChild(lblInfo);
 
-        var btnRefuel = new Button { Text = "⛽ Refuel All Machinery (Top Up Tanks)" };
+        var btnRefuel = new Button { Text = "⛽ Заправить технику (Полные баки)" };
         btnRefuel.Pressed += () =>
         {
             if (_simulation != null)
@@ -136,7 +152,7 @@ public partial class ManagementWindow : Window
         };
         mach.AddChild(btnRefuel);
 
-        var btnRepair = new Button { Text = "🔧 Service & Repair All Vehicles (Workshop Overhaul)" };
+        var btnRepair = new Button { Text = "🔧 Провести полное техобслуживание и ремонт" };
         btnRepair.Pressed += () =>
         {
             if (_simulation != null)
@@ -155,17 +171,17 @@ public partial class ManagementWindow : Window
 
     private void BuildMarketTab()
     {
-        var market = new VBoxContainer { Name = "📈 Market & Silo" };
+        var market = new VBoxContainer { Name = "📈 Рынок и склад" };
 
-        var lblPrices = new Label { Text = "Commodity Trading & Prices (per ton):" };
+        var lblPrices = new Label { Text = "Текущие биржевые цены на урожай (за тонну):" };
         market.AddChild(lblPrices);
 
         foreach (CropType crop in Enum.GetValues<CropType>())
         {
             var row = new HBoxContainer();
-            row.AddChild(new Label { Text = $"🌾 {crop}: ", CustomMinimumSize = new Vector2(120, 0) });
+            row.AddChild(new Label { Text = $"🌾 {crop}: ", CustomMinimumSize = new Vector2(130, 0) });
 
-            var btnSell = new Button { Text = $"Sell {crop} Stock" };
+            var btnSell = new Button { Text = $"Продать {crop}" };
             var cropLocal = crop;
             btnSell.Pressed += () =>
             {
@@ -185,32 +201,64 @@ public partial class ManagementWindow : Window
 
     private void BuildAutomationTab()
     {
-        var auto = new VBoxContainer { Name = "⚙️ Automation AI" };
+        var auto = new VBoxContainer { Name = "⚙️ Автоматизация" };
 
-        _chkAutoPlow = new CheckBox { Text = "Auto-Plow when field is cleared", ButtonPressed = true };
+        _chkAutoPlow = new CheckBox { Text = "Автоматическая вспашка поля", ButtonPressed = true };
         _chkAutoPlow.Toggled += v => { if (_simulation != null) _simulation.AutomationSystem.AutoPlow = v; };
         auto.AddChild(_chkAutoPlow);
 
-        _chkAutoSow = new CheckBox { Text = "Auto-Sow selected seed variety", ButtonPressed = true };
+        _chkAutoSow = new CheckBox { Text = "Автоматический посев семян", ButtonPressed = true };
         _chkAutoSow.Toggled += v => { if (_simulation != null) _simulation.AutomationSystem.AutoSow = v; };
         auto.AddChild(_chkAutoSow);
 
-        _chkAutoHarvest = new CheckBox { Text = "Auto-Harvest when crops mature", ButtonPressed = true };
+        _chkAutoHarvest = new CheckBox { Text = "Автоматическая уборка созревшего урожая", ButtonPressed = true };
         _chkAutoHarvest.Toggled += v => { if (_simulation != null) _simulation.AutomationSystem.AutoHarvest = v; };
         auto.AddChild(_chkAutoHarvest);
 
-        _chkAutoRefuel = new CheckBox { Text = "Auto-Refuel at low fuel warning", ButtonPressed = true };
+        _chkAutoRefuel = new CheckBox { Text = "Автоматическая дозаправка техники", ButtonPressed = true };
         _chkAutoRefuel.Toggled += v => { if (_simulation != null) _simulation.AutomationSystem.AutoRefuel = v; };
         auto.AddChild(_chkAutoRefuel);
 
         _tabs?.AddChild(auto);
     }
 
+    private void BuildSettingsTab()
+    {
+        var settings = new VBoxContainer { Name = "⚙️ Настройки" };
+
+        var rowHeight = new HBoxContainer();
+        rowHeight.AddChild(new Label { Text = "Высота оверлея (px): " });
+        _spinHeight = new SpinBox
+        {
+            MinValue = 180,
+            MaxValue = 400,
+            Step = 10,
+            Value = WindowsOverlayService.Instance.ConfiguredLogicalHeight
+        };
+        _spinHeight.ValueChanged += val =>
+        {
+            WindowsOverlayService.Instance.ConfiguredLogicalHeight = (int)val;
+            WindowsOverlayService.Instance.PositionOverlayAboveTaskbar();
+        };
+        rowHeight.AddChild(_spinHeight);
+        settings.AddChild(rowHeight);
+
+        var chkInteractive = new CheckBox { Text = "Интерактивный режим (принимать клики мышью)" };
+        chkInteractive.ButtonPressed = WindowsOverlayService.Instance.IsInteractive;
+        chkInteractive.Toggled += val =>
+        {
+            WindowsOverlayService.Instance.SetInteractiveMode(val);
+        };
+        settings.AddChild(chkInteractive);
+
+        _tabs?.AddChild(settings);
+    }
+
     private void BuildDevTab()
     {
-        var dev = new VBoxContainer { Name = "🛠️ Dev Cheats" };
+        var dev = new VBoxContainer { Name = "🛠️ Чит-панель" };
 
-        var btnAddCoins = new Button { Text = "+5,000 Coins" };
+        var btnAddCoins = new Button { Text = "+5,000 Монет" };
         btnAddCoins.Pressed += () =>
         {
             _simulation?.EconomySystem.AddIncome(5000f, "Dev grant");
@@ -218,7 +266,7 @@ public partial class ManagementWindow : Window
         };
         dev.AddChild(btnAddCoins);
 
-        var btnInstaGrow = new Button { Text = "Instant Crop Maturation (100% Growth)" };
+        var btnInstaGrow = new Button { Text = "Мгновенное созревание урожая (100% готов к уборке)" };
         btnInstaGrow.Pressed += () =>
         {
             if (_simulation != null)
@@ -233,7 +281,7 @@ public partial class ManagementWindow : Window
         };
         dev.AddChild(btnInstaGrow);
 
-        var btnRain = new Button { Text = "Trigger Rain Storm" };
+        var btnRain = new Button { Text = "Вызвать дождь" };
         btnRain.Pressed += () =>
         {
             _simulation?.WeatherSystem.ForceWeather(WeatherType.Rain, 180f);
@@ -248,15 +296,21 @@ public partial class ManagementWindow : Window
         if (_simulation == null) return;
 
         if (_lblBalance != null)
-            _lblBalance.Text = $"💰 {_simulation.EconomySystem.Balance:F0} Coins";
+            _lblBalance.Text = $"💰 {_simulation.EconomySystem.Balance:F0} Монет";
 
         if (_lblStorage != null)
-            _lblStorage.Text = $"🏚️ Silo: {_simulation.StorageSystem.GetTotalStoredTons():F1} / {_simulation.StorageSystem.MaxCapacityTons:F0} t";
+            _lblStorage.Text = $"🏚️ Элеватор: {_simulation.StorageSystem.GetTotalStoredTons():F1} / {_simulation.StorageSystem.MaxCapacityTons:F0} т";
 
         if (_lblCropStatus != null)
         {
             float avgGrowth = _simulation.FieldSystem.GetAverageFieldGrowth(1);
-            _lblCropStatus.Text = $"🌾 Field Growth: {avgGrowth * 100:F0}%";
+            _lblCropStatus.Text = $"🌾 Рост пшеницы: {avgGrowth * 100:F0}%";
+        }
+
+        if (_lblTractorStatus != null && _simulation.VehicleSystem.Vehicles.Count > 0)
+        {
+            var v = _simulation.VehicleSystem.Vehicles[0];
+            _lblTractorStatus.Text = $"🚜 Трактор: {v.Name} | Топливо: {v.FuelLevel:F0}/{v.FuelCapacity:F0}L | Состояние: {v.Condition * 100:F0}%";
         }
     }
 }

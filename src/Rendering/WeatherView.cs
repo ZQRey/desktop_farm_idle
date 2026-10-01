@@ -65,7 +65,7 @@ public partial class WeatherView : Node2D
         // Lightning flash overlay
         _lightningFlash = new ColorRect
         {
-            Size = new Vector2(1920, 200),
+            Size = new Vector2(3840, 240),
             Color = new Color(1, 1, 1, 0),
             MouseFilter = Control.MouseFilterEnum.Ignore
         };

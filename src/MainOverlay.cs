@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using Godot;
 using DesktopFarmIdle.Core.Logging;
 using DesktopFarmIdle.DesktopIntegration;
@@ -11,36 +12,42 @@ namespace DesktopFarmIdle;
 public partial class MainOverlay : Node2D
 {
     private GameSimulation? _simulation;
-    private WindowController? _windowController;
     private SystemTrayController? _trayController;
 
     private FieldRenderer? _fieldRenderer;
     private VehicleView? _vehicleView;
     private CatView? _catView;
     private WeatherView? _weatherView;
-    private OverlayHud? _overlayHud;
+    private OverlayHud? _toastOverlay;
     private ManagementWindow? _managementWindow;
+
+    private float _displayCheckTimer = 0f;
+    private const float DisplayCheckInterval = 3.0f; // Check for taskbar/display shifts every 3s
 
     public override void _Ready()
     {
+        // 0. Ensure Windows desktop assemblies can resolve
+        DesktopFarmIdle.Core.WindowsDesktopResolver.Initialize();
+
         GameLogger.Instance.Info("MainOverlay _Ready starting...", "MainOverlay");
 
         // 1. Initialize Core Simulation
         _simulation = new GameSimulation();
 
-        // 2. Set up visual scenery
+        // 2. Build World Scenery (0 clickable UI controls in desktop world!)
         BuildScenery();
 
-        // 3. Set up HUD and Management window
-        _overlayHud = new OverlayHud();
-        _overlayHud.BindSimulation(_simulation);
-        AddChild(_overlayHud);
+        // 3. Transient Toast Overlay (Non-persistent, mouse ignore)
+        _toastOverlay = new OverlayHud();
+        _toastOverlay.BindSimulation(_simulation);
+        AddChild(_toastOverlay);
 
+        // 4. Standalone Management Window
         _managementWindow = new ManagementWindow();
         _managementWindow.BindSimulation(_simulation);
         AddChild(_managementWindow);
 
-        // 4. Windows Desktop Integration
+        // 5. Windows Desktop Integration
         InitializeWindowsIntegration();
 
         GameLogger.Instance.Info("MainOverlay initialized successfully.", "MainOverlay");
@@ -50,27 +57,27 @@ public partial class MainOverlay : Node2D
     {
         if (_simulation == null) return;
 
-        // Background Silo Building
+        // Background Silo Building (Far right, sitting on ground line Y=160)
         var siloTex = GD.Load<Texture2D>("res://assets/environment/buildings/silo.png");
         var siloSprite = new Sprite2D
         {
             Texture = siloTex,
-            Scale = new Vector2(0.13f, 0.13f),
-            Position = new Vector2(1820, 100)
+            Scale = new Vector2(0.12f, 0.12f),
+            Position = new Vector2(1780, 105)
         };
         AddChild(siloSprite);
 
-        // Weather effects (rain/snow/lightning)
+        // Weather effects (rain, snow, lightning) across viewport
         _weatherView = new WeatherView();
         _weatherView.BindWeather(_simulation.WeatherSystem);
         AddChild(_weatherView);
 
-        // Field soil & crop renderer
+        // Field soil & crop renderer (Prominently visible across Y: 150-240)
         _fieldRenderer = new FieldRenderer();
         _fieldRenderer.BindField(_simulation.FieldSystem.Fields[0]);
         AddChild(_fieldRenderer);
 
-        // Layered tractor vehicle
+        // Layered tractor vehicle (Rolling on soil surface at Y=160)
         _vehicleView = new VehicleView();
         _vehicleView.BindVehicle(_simulation.VehicleSystem.Vehicles[0]);
         AddChild(_vehicleView);
@@ -84,17 +91,32 @@ public partial class MainOverlay : Node2D
     {
         try
         {
-            IntPtr hwnd = (IntPtr)DisplayServer.WindowGetNativeHandle(DisplayServer.HandleType.WindowHandle);
-            _windowController = new WindowController();
-            bool attached = _windowController.Initialize(hwnd);
+            // Acquire native HWND
+            int winId = (int)DisplayServer.MainWindowId;
+            IntPtr hwnd = (IntPtr)DisplayServer.WindowGetNativeHandle(DisplayServer.HandleType.WindowHandle, winId);
+            if (hwnd == IntPtr.Zero)
+            {
+                hwnd = Process.GetCurrentProcess().MainWindowHandle;
+            }
 
-            if (attached)
+            // Attach WindowsOverlayService
+            bool attached = WindowsOverlayService.Instance.Attach(hwnd);
+
+            // Also configure Godot's internal window position and size to match
+            var (x, y, width, height) = WindowsOverlayService.Instance.CalculateOverlayBounds();
+            DisplayServer.WindowSetSize(new Vector2I(width, height), winId);
+            DisplayServer.WindowSetPosition(new Vector2I(x, y), winId);
+            DisplayServer.WindowSetFlag(DisplayServer.WindowFlags.AlwaysOnTop, false, winId);
+            DisplayServer.WindowSetFlag(DisplayServer.WindowFlags.Borderless, true, winId);
+            DisplayServer.WindowSetFlag(DisplayServer.WindowFlags.Transparent, true, winId);
+
+            if (attached && hwnd != IntPtr.Zero)
             {
                 _trayController = new SystemTrayController(hwnd);
 
-                // Wire up tray menu actions
+                // Wire up tray callbacks
                 _trayController.OnToggleInteractive = ToggleInteractiveMode;
-                _trayController.OnOpenManagement = () => _managementWindow?.Show();
+                _trayController.OnOpenManagement = () => _managementWindow?.Open();
                 _trayController.OnTogglePause = TogglePause;
                 _trayController.OnExit = ExitGame;
 
@@ -114,10 +136,10 @@ public partial class MainOverlay : Node2D
                 {
                     float g = _simulation?.FieldSystem.GetAverageFieldGrowth(1) ?? 0f;
                     int remainingSec = (int)((1.0f - g) * 360f);
-                    return $"До урожая: {remainingSec / 60:D2}:{remainingSec % 60:D2}";
+                    return $"До уборки: {remainingSec / 60:D2}:{remainingSec % 60:D2}";
                 };
 
-                _trayController.IsInteractiveActive = () => _windowController.IsInteractive;
+                _trayController.IsInteractiveActive = () => WindowsOverlayService.Instance.IsInteractive;
                 _trayController.IsPausedActive = () => _simulation?.Clock.IsPaused ?? false;
 
                 _trayController.Initialize();
@@ -131,25 +153,40 @@ public partial class MainOverlay : Node2D
 
     public override void _Process(double delta)
     {
+        float dt = (float)delta;
+
         // Advance simulation clock
-        _simulation?.Update((float)delta);
+        _simulation?.Update(dt);
+
+        // Periodically verify taskbar & monitor position
+        _displayCheckTimer += dt;
+        if (_displayCheckTimer >= DisplayCheckInterval)
+        {
+            _displayCheckTimer = 0f;
+            WindowsOverlayService.Instance.PositionOverlayAboveTaskbar();
+        }
     }
 
     public void ToggleInteractiveMode()
     {
-        if (_windowController == null) return;
-        _windowController.ToggleInteractive();
-        _overlayHud?.SetInteractiveDisplay(_windowController.IsInteractive);
+        WindowsOverlayService.Instance.ToggleInteractiveMode();
+        string msg = WindowsOverlayService.Instance.IsInteractive
+            ? "🖱️ Интерактивный режим ВКЛЮЧЕН (клики активны)"
+            : "🖱️ Режим Click-Through ВКЛЮЧЕН (клики проходят сквозь ферму)";
+        _toastOverlay?.ShowToast(msg, 3.0f);
     }
 
     public void TogglePause()
     {
         if (_simulation == null) return;
         _simulation.Clock.IsPaused = !_simulation.Clock.IsPaused;
+        string msg = _simulation.Clock.IsPaused ? "⏸️ Ферма на паузе" : "▶️ Ферма возобновлена";
+        _toastOverlay?.ShowToast(msg, 2.5f);
     }
 
     public void ExitGame()
     {
+        GameLogger.Instance.Info("Exiting Desktop Farm Idle...", "MainOverlay");
         _simulation?.SaveGame();
         _trayController?.Dispose();
         GetTree().Quit();

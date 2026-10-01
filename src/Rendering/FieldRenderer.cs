@@ -10,18 +10,19 @@ public partial class FieldRenderer : Node2D
     private FieldModel? _field;
     private float _windTimer = 0f;
 
-    // Palette
-    private static readonly Color ColorSoilStubble = new(0.38f, 0.28f, 0.18f);
-    private static readonly Color ColorStubbleStraw = new(0.78f, 0.65f, 0.32f);
-    private static readonly Color ColorSoilPlowedDark = new(0.20f, 0.14f, 0.08f);
-    private static readonly Color ColorSoilPlowedRidge = new(0.28f, 0.19f, 0.11f);
-    private static readonly Color ColorSoilCultivated = new(0.32f, 0.22f, 0.13f);
-    private static readonly Color ColorSoilSeeded = new(0.30f, 0.21f, 0.12f);
-    private static readonly Color ColorSproutGreen = new(0.45f, 0.75f, 0.22f);
-    private static readonly Color ColorVegGreen = new(0.30f, 0.65f, 0.18f);
-    private static readonly Color ColorRipeningWheat = new(0.75f, 0.70f, 0.25f);
-    private static readonly Color ColorGoldenWheat = new(0.92f, 0.76f, 0.24f);
-    private static readonly Color ColorWheatAmber = new(0.82f, 0.60f, 0.15f);
+    // Rich rural palette
+    private static readonly Color ColorSubSoil = new(0.14f, 0.09f, 0.05f);
+    private static readonly Color ColorSoilStubble = new(0.36f, 0.26f, 0.16f);
+    private static readonly Color ColorStubbleStraw = new(0.82f, 0.68f, 0.30f);
+    private static readonly Color ColorSoilPlowedDark = new(0.18f, 0.12f, 0.07f);
+    private static readonly Color ColorSoilPlowedRidge = new(0.26f, 0.18f, 0.10f);
+    private static readonly Color ColorSoilCultivated = new(0.30f, 0.20f, 0.12f);
+    private static readonly Color ColorSoilSeeded = new(0.28f, 0.19f, 0.11f);
+    private static readonly Color ColorSproutGreen = new(0.48f, 0.78f, 0.20f);
+    private static readonly Color ColorVegGreen = new(0.32f, 0.68f, 0.16f);
+    private static readonly Color ColorRipeningWheat = new(0.80f, 0.72f, 0.22f);
+    private static readonly Color ColorGoldenWheat = new(0.96f, 0.80f, 0.22f);
+    private static readonly Color ColorWheatAmber = new(0.85f, 0.62f, 0.14f);
 
     public void BindField(FieldModel field)
     {
@@ -32,7 +33,6 @@ public partial class FieldRenderer : Node2D
     public override void _Process(double delta)
     {
         _windTimer += (float)delta * 2.5f;
-        // Redraw for swaying crops and progressive work
         QueueRedraw();
     }
 
@@ -40,15 +40,16 @@ public partial class FieldRenderer : Node2D
     {
         if (_field == null) return;
 
-        float startX = 60.0f;
-        float groundY = 150.0f;
+        float startX = 40.0f;
+        float groundY = 160.0f; // Top surface of the soil
         float cellWidth = GameBalanceConfig.FieldCellWidthWorldUnits;
-        float cellHeight = 28.0f;
-
-        // Draw sub-layer ground bed
+        float cellHeight = 55.0f; // Deep visible soil bed down to Y=215
         float totalWidth = _field.CellCount * cellWidth;
-        DrawRect(new Rect2(startX - 20, groundY + 8, totalWidth + 40, 25), new Color(0.18f, 0.12f, 0.07f));
 
+        // Draw sub-layer base loamy ground bed (Y: 215 to 240)
+        DrawRect(new Rect2(0, groundY + cellHeight, totalWidth + 200, 25), ColorSubSoil);
+
+        // Draw individual field cells
         for (int i = 0; i < _field.CellCount; i++)
         {
             var cell = _field.Cells[i];
@@ -66,38 +67,40 @@ public partial class FieldRenderer : Node2D
         {
             case SoilState.Stubble or SoilState.Harvested:
                 DrawRect(rect, ColorSoilStubble);
-                // Stubble straws
+                // Stubble straw tufts
                 for (int s = 0; s < 4; s++)
                 {
                     float sx = rect.Position.X + 4 + s * 7;
-                    DrawLine(new Vector2(sx, rect.Position.Y + 2), new Vector2(sx + 2, rect.Position.Y - 5), ColorStubbleStraw, 1.5f);
+                    DrawLine(new Vector2(sx, rect.Position.Y + 2), new Vector2(sx + 2, rect.Position.Y - 6), ColorStubbleStraw, 1.8f);
                 }
                 break;
 
             case SoilState.Plowed:
                 DrawRect(rect, ColorSoilPlowedDark);
-                // Deep curved furrows
-                DrawLine(new Vector2(rect.Position.X, rect.Position.Y + 4), new Vector2(rect.End.X, rect.Position.Y + 8), ColorSoilPlowedRidge, 3.0f);
-                DrawLine(new Vector2(rect.Position.X, rect.Position.Y + 14), new Vector2(rect.End.X, rect.Position.Y + 18), ColorSoilPlowedRidge, 2.5f);
+                // Deep curved furrows across the cell
+                DrawLine(new Vector2(rect.Position.X, rect.Position.Y + 8), new Vector2(rect.End.X, rect.Position.Y + 14), ColorSoilPlowedRidge, 4.0f);
+                DrawLine(new Vector2(rect.Position.X, rect.Position.Y + 24), new Vector2(rect.End.X, rect.Position.Y + 30), ColorSoilPlowedRidge, 3.5f);
+                DrawLine(new Vector2(rect.Position.X, rect.Position.Y + 40), new Vector2(rect.End.X, rect.Position.Y + 45), ColorSoilPlowedRidge, 3.0f);
                 break;
 
             case SoilState.Cultivated:
                 DrawRect(rect, ColorSoilCultivated);
-                // Fine smooth tilled texture
-                for (int d = 0; d < 3; d++)
+                // Fine smooth tilled seedbed
+                for (int d = 0; d < 4; d++)
                 {
-                    float dx = rect.Position.X + 6 + d * 9;
-                    DrawCircle(new Vector2(dx, rect.Position.Y + 6), 1.5f, ColorSoilPlowedRidge);
+                    float dx = rect.Position.X + 5 + d * 7;
+                    DrawCircle(new Vector2(dx, rect.Position.Y + 12), 2.0f, ColorSoilPlowedRidge);
+                    DrawCircle(new Vector2(dx + 3, rect.Position.Y + 28), 1.8f, ColorSoilPlowedRidge);
                 }
                 break;
 
             case SoilState.Seeded:
                 DrawRect(rect, ColorSoilSeeded);
-                // Tiny seed marks
+                // Seed drill rows
                 for (int s = 0; s < 3; s++)
                 {
                     float sx = rect.Position.X + 5 + s * 10;
-                    DrawCircle(new Vector2(sx, rect.Position.Y + 4), 1.2f, ColorGoldenWheat);
+                    DrawCircle(new Vector2(sx, rect.Position.Y + 8), 1.5f, ColorGoldenWheat);
                 }
                 break;
 
@@ -120,7 +123,7 @@ public partial class FieldRenderer : Node2D
                 for (int i = 0; i < 3; i++)
                 {
                     float bx = cx + 5 + i * 9;
-                    DrawLine(new Vector2(bx, groundY), new Vector2(bx + windSway * 1.0f, groundY - 6), ColorSproutGreen, 1.5f);
+                    DrawLine(new Vector2(bx, groundY), new Vector2(bx + windSway * 1.2f, groundY - 8), ColorSproutGreen, 1.8f);
                 }
                 break;
 
@@ -128,7 +131,7 @@ public partial class FieldRenderer : Node2D
                 for (int i = 0; i < 4; i++)
                 {
                     float bx = cx + 4 + i * 7;
-                    DrawLine(new Vector2(bx, groundY), new Vector2(bx + windSway * 2.0f, groundY - 14), ColorVegGreen, 1.8f);
+                    DrawLine(new Vector2(bx, groundY), new Vector2(bx + windSway * 2.2f, groundY - 18), ColorVegGreen, 2.0f);
                 }
                 break;
 
@@ -136,9 +139,9 @@ public partial class FieldRenderer : Node2D
                 for (int i = 0; i < 4; i++)
                 {
                     float bx = cx + 4 + i * 7;
-                    float topX = bx + windSway * 3.5f;
-                    DrawLine(new Vector2(bx, groundY), new Vector2(topX, groundY - 24), ColorVegGreen, 2.0f);
-                    DrawCircle(new Vector2(topX, groundY - 24), 2.2f, ColorRipeningWheat);
+                    float topX = bx + windSway * 3.8f;
+                    DrawLine(new Vector2(bx, groundY), new Vector2(topX, groundY - 30), ColorVegGreen, 2.2f);
+                    DrawCircle(new Vector2(topX, groundY - 30), 2.5f, ColorRipeningWheat);
                 }
                 break;
 
@@ -146,9 +149,9 @@ public partial class FieldRenderer : Node2D
                 for (int i = 0; i < 5; i++)
                 {
                     float bx = cx + 3 + i * 6;
-                    float topX = bx + windSway * 4.5f;
-                    DrawLine(new Vector2(bx, groundY), new Vector2(topX, groundY - 32), ColorRipeningWheat, 2.2f);
-                    DrawLine(new Vector2(topX, groundY - 32), new Vector2(topX + windSway * 2f, groundY - 38), ColorGoldenWheat, 3.0f);
+                    float topX = bx + windSway * 4.8f;
+                    DrawLine(new Vector2(bx, groundY), new Vector2(topX, groundY - 40), ColorRipeningWheat, 2.4f);
+                    DrawLine(new Vector2(topX, groundY - 40), new Vector2(topX + windSway * 2.2f, groundY - 46), ColorGoldenWheat, 3.2f);
                 }
                 break;
 
@@ -156,12 +159,12 @@ public partial class FieldRenderer : Node2D
                 for (int i = 0; i < 5; i++)
                 {
                     float bx = cx + 3 + i * 6;
-                    float topX = bx + windSway * 5.5f;
+                    float topX = bx + windSway * 6.0f;
                     // Golden wheat stalks
-                    DrawLine(new Vector2(bx, groundY), new Vector2(topX, groundY - 36), ColorWheatAmber, 2.4f);
-                    // Plump golden wheat head with awns
-                    DrawLine(new Vector2(topX, groundY - 36), new Vector2(topX + windSway * 3f, groundY - 44), ColorGoldenWheat, 3.8f);
-                    DrawCircle(new Vector2(topX + windSway * 3f, groundY - 44), 2.5f, ColorGoldenWheat);
+                    DrawLine(new Vector2(bx, groundY), new Vector2(topX, groundY - 44), ColorWheatAmber, 2.6f);
+                    // Ripe golden ear of wheat with awns
+                    DrawLine(new Vector2(topX, groundY - 44), new Vector2(topX + windSway * 3.5f, groundY - 52), ColorGoldenWheat, 4.0f);
+                    DrawCircle(new Vector2(topX + windSway * 3.5f, groundY - 52), 3.0f, ColorGoldenWheat);
                 }
                 break;
         }

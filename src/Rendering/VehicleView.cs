@@ -119,8 +119,8 @@ public partial class VehicleView : Node2D
         float dx = currentX - _lastPositionX;
         _lastPositionX = currentX;
 
-        // Position on field (ground line is around y=130)
-        Position = new Vector2(currentX, 126.0f);
+        // Position on field (ground line is around y=160, wheels touch earth)
+        Position = new Vector2(currentX, 138.0f);
 
         // Flip orientation based on movement direction
         Scale = new Vector2(_vehicle.MoveDirection > 0 ? 1.0f : -1.0f, 1.0f);

@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using Godot;
+using DesktopFarmIdle.Core.Events;
 using DesktopFarmIdle.Simulation;
 
 namespace DesktopFarmIdle.UI;
@@ -7,96 +9,97 @@ namespace DesktopFarmIdle.UI;
 public partial class OverlayHud : Control
 {
     private GameSimulation? _simulation;
-    private Label? _statusPill;
-    private Label? _interactiveIndicator;
-    private float _updateTimer = 0f;
+    private readonly Queue<(string text, float duration)> _pendingToasts = new();
+    private Label? _toastLabel;
+    private PanelContainer? _toastPanel;
+    private float _toastTimer = 0f;
+    private float _currentDuration = 0f;
 
     public void BindSimulation(GameSimulation simulation)
     {
         _simulation = simulation;
+        _simulation.EventBus.Subscribe<VehicleBrokenEvent>(OnVehicleBroken);
+        _simulation.EventBus.Subscribe<HarvestCompletedEvent>(OnHarvestCompleted);
+        _simulation.EventBus.Subscribe<WeatherChangedEvent>(OnWeatherChanged);
     }
 
     public override void _Ready()
     {
+        // Zero persistent HUD. Completely pass-through mouse filter.
         MouseFilter = MouseFilterEnum.Ignore;
         AnchorRight = 1.0f;
         AnchorBottom = 1.0f;
 
-        // Top-left subtle ambient status pill
-        var panel = new PanelContainer
+        // Subtle contextual toast bubble that appears only on events and fades out
+        _toastPanel = new PanelContainer
         {
-            Position = new Vector2(40, 10),
-            MouseFilter = MouseFilterEnum.Ignore
-        };
-        AddChild(panel);
-
-        _statusPill = new Label
-        {
-            Text = "🌾 Desktop Farm Idle",
-            MouseFilter = MouseFilterEnum.Ignore
-        };
-        _statusPill.AddThemeFontSizeOverride("font_size", 13);
-        _statusPill.AddThemeColorOverride("font_color", new Color(0.95f, 0.95f, 0.90f, 0.9f));
-        panel.AddChild(_statusPill);
-
-        // Interactive mode indicator (shown only in interactive mode)
-        var interPanel = new PanelContainer
-        {
-            Position = new Vector2(300, 10),
-            MouseFilter = MouseFilterEnum.Ignore
-        };
-        AddChild(interPanel);
-
-        _interactiveIndicator = new Label
-        {
-            Text = "🖱️ [Interactive Mode Active - Clicks Enabled]",
+            Position = new Vector2(50, 16),
             MouseFilter = MouseFilterEnum.Ignore,
-            Visible = false
+            Modulate = new Color(1, 1, 1, 0) // Hidden by default
         };
-        _interactiveIndicator.AddThemeFontSizeOverride("font_size", 12);
-        _interactiveIndicator.AddThemeColorOverride("font_color", new Color(0.4f, 0.9f, 0.4f, 0.95f));
-        interPanel.AddChild(_interactiveIndicator);
+        AddChild(_toastPanel);
+
+        _toastLabel = new Label
+        {
+            Text = string.Empty,
+            MouseFilter = MouseFilterEnum.Ignore
+        };
+        _toastLabel.AddThemeFontSizeOverride("font_size", 13);
+        _toastLabel.AddThemeColorOverride("font_color", new Color(0.95f, 0.95f, 0.90f, 0.95f));
+        _toastPanel.AddChild(_toastLabel);
     }
 
-    public void SetInteractiveDisplay(bool isInteractive)
+    private void OnVehicleBroken(VehicleBrokenEvent e)
     {
-        if (_interactiveIndicator != null)
-        {
-            _interactiveIndicator.Visible = isInteractive;
-        }
+        ShowToast($"⚠️ Трактор: {e.BreakdownReason}", 4.0f);
+    }
+
+    private void OnHarvestCompleted(HarvestCompletedEvent e)
+    {
+        ShowToast($"🌾 Собрано {e.TonsHarvested:F1} т урожая пшеницы!", 4.0f);
+    }
+
+    private void OnWeatherChanged(WeatherChangedEvent e)
+    {
+        ShowToast($"⛅ Погода изменилась: {e.WeatherName}", 3.0f);
+    }
+
+    public void ShowToast(string message, float duration = 3.5f)
+    {
+        _pendingToasts.Enqueue((message, duration));
     }
 
     public override void _Process(double delta)
     {
-        _updateTimer += (float)delta;
-        if (_updateTimer >= 0.5f)
+        float dt = (float)delta;
+
+        if (_toastTimer > 0f)
         {
-            _updateTimer = 0f;
-            UpdateStatusText();
+            _toastTimer -= dt;
+            if (_toastTimer <= 0f)
+            {
+                if (_toastPanel != null) _toastPanel.Modulate = new Color(1, 1, 1, 0);
+            }
+            else
+            {
+                // Smooth fade in / out
+                float alpha = 1.0f;
+                if (_toastTimer < 0.8f)
+                    alpha = _toastTimer / 0.8f;
+                else if (_toastTimer > (_currentDuration - 0.5f))
+                    alpha = (_currentDuration - _toastTimer) / 0.5f;
+
+                if (_toastPanel != null)
+                    _toastPanel.Modulate = new Color(1, 1, 1, Math.Clamp(alpha, 0f, 1f));
+            }
         }
-    }
-
-    private void UpdateStatusText()
-    {
-        if (_simulation == null || _statusPill == null) return;
-
-        var tractor = _simulation.VehicleSystem.Vehicles[0];
-        if (tractor.IsBroken)
+        else if (_pendingToasts.Count > 0)
         {
-            _statusPill.Text = $"⚠️ Tractor Service Required: {tractor.BreakdownReason}";
-            return;
+            var (text, duration) = _pendingToasts.Dequeue();
+            if (_toastLabel != null) _toastLabel.Text = text;
+            _currentDuration = duration;
+            _toastTimer = duration;
+            if (_toastPanel != null) _toastPanel.Modulate = new Color(1, 1, 1, 0.01f);
         }
-
-        string task = tractor.CurrentTask switch
-        {
-            Simulation.Vehicles.VehicleTaskType.Plowing => "🚜 Plowing Furrows...",
-            Simulation.Vehicles.VehicleTaskType.Cultivating => "🚜 Cultivating Seedbed...",
-            Simulation.Vehicles.VehicleTaskType.Sowing => "🌱 Sowing Wheat...",
-            Simulation.Vehicles.VehicleTaskType.Harvesting => "🌾 Harvesting Crop...",
-            _ => "🌾 Resting"
-        };
-
-        float avgGrowth = _simulation.FieldSystem.GetAverageFieldGrowth(1) * 100f;
-        _statusPill.Text = $"{task} | Wheat: {avgGrowth:F0}% | 💰 {_simulation.EconomySystem.Balance:F0} Coins";
     }
 }
