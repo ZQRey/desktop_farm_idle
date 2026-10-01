@@ -7,7 +7,8 @@ public partial class CatView : Node2D
 {
     private Sprite2D? _catSprite;
     private float _walkTimer = 0f;
-    private float _actionTimer = 5.0f;
+    private float _legCycleTimer = 0f;
+    private float _actionTimer = 4.0f;
     private int _catState = 0; // 0 = walk, 1 = sit/watch, 2 = sleep
     private float _catX = 1400.0f;
     private float _catDir = -1.0f;
@@ -19,11 +20,13 @@ public partial class CatView : Node2D
 
     public override void _Ready()
     {
-        var catTex = GD.Load<Texture2D>("res://assets/environment/animals/cat.png");
+        var catSheetTex = GD.Load<Texture2D>("res://assets/environment/animals/cat_walk_sheet.png");
         _catSprite = new Sprite2D
         {
-            Texture = catTex,
-            Scale = new Vector2(0.038f, 0.038f),
+            Texture = catSheetTex,
+            Hframes = 4,
+            Frame = 0,
+            Scale = new Vector2(0.080f, 0.080f),
             Position = new Vector2(0, 0)
         };
         AddChild(_catSprite);
@@ -39,28 +42,37 @@ public partial class CatView : Node2D
         {
             var rnd = new Random();
             _catState = rnd.Next(3);
-            _actionTimer = 4.0f + (float)rnd.NextDouble() * 8.0f;
+            _actionTimer = 4.0f + (float)rnd.NextDouble() * 7.0f;
             if (_catState == 0)
             {
                 _catDir = rnd.Next(2) == 0 ? 1.0f : -1.0f;
             }
         }
 
-        if (_catState == 0) // Walking along farm field
+        if (_catState == 0) // Walking along farm field with animated paws
         {
             _walkTimer += dt * 8.0f;
-            _catX += _catDir * 16.0f * dt;
+            _legCycleTimer += dt * 7.0f; // 7 steps per second
+            _catX += _catDir * 18.0f * dt;
             _catX = Math.Clamp(_catX, 200.0f, 1750.0f);
 
-            Position = new Vector2(_catX, CatCenterY + MathF.Sin(_walkTimer) * 0.6f);
-            Scale = new Vector2(_catDir > 0 ? -1.0f : 1.0f, 1.0f);
+            // Animate leg frames 0 -> 1 -> 2 -> 3
+            if (_catSprite != null)
+            {
+                _catSprite.Frame = ((int)_legCycleTimer) % 4;
+            }
+
+            Position = new Vector2(_catX, CatCenterY + MathF.Sin(_walkTimer) * 0.5f);
+            Scale = new Vector2(_catDir > 0 ? 1.0f : -1.0f, 1.0f);
         }
         else if (_catState == 1) // Sitting and watching the field
         {
+            if (_catSprite != null) _catSprite.Frame = 0;
             Position = new Vector2(_catX, CatCenterY);
         }
         else // Resting/napping
         {
+            if (_catSprite != null) _catSprite.Frame = 0;
             Position = new Vector2(_catX, CatCenterY + 1.0f);
         }
     }

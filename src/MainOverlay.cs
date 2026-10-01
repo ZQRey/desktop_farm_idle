@@ -32,6 +32,7 @@ public partial class MainOverlay : Node2D
         // 1. Force hardware-transparent clear color and transparent viewport
         RenderingServer.SetDefaultClearColor(new Color(0, 0, 0, 0));
         GetTree().Root.TransparentBg = true;
+        GetViewport().TransparentBg = true;
 
         GameLogger.Instance.Info("MainOverlay _Ready starting...", "MainOverlay");
 

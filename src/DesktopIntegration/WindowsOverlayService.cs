@@ -21,6 +21,9 @@ public class WindowsOverlayService
     public const int WS_EX_NOACTIVATE = 0x08000000;
     public const int WS_EX_APPWINDOW = 0x00040000;
 
+    public const uint LWA_COLORKEY = 0x00000001;
+    public const uint LWA_ALPHA = 0x00000002;
+
     public const uint SWP_NOSIZE = 0x0001;
     public const uint SWP_NOMOVE = 0x0002;
     public const uint SWP_NOZORDER = 0x0004;
@@ -90,6 +93,9 @@ public class WindowsOverlayService
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SetLayeredWindowAttributes(IntPtr hwnd, uint crKey, byte bAlpha, uint dwFlags);
 
     [DllImport("user32.dll")]
     public static extern uint GetDpiForWindow(IntPtr hWnd);
@@ -176,6 +182,9 @@ public class WindowsOverlayService
             }
 
             SetWindowLongPtr(_hwnd, GWL_EXSTYLE, new IntPtr(ex));
+
+            // Ensure layered window has 255 master alpha so per-pixel DWM alpha composites cleanly
+            SetLayeredWindowAttributes(_hwnd, 0, 255, LWA_ALPHA);
 
             // Z-Order: Use HWND_NOTOPMOST so regular applications can cover it, but desktop shows it
             SetWindowPos(_hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
