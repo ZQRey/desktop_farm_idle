@@ -1,0 +1,38 @@
+# Godot 4+ specific ignores
+.godot/
+*.translation
+
+# Mono / .NET specific ignores
+.mono/
+[Bb]in/
+[Oo]bj/
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.opendb
+*.VC.db
+
+# Visual Studio / Rider / VSCode
+.vs/
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build artifacts
+build/
+export/
+dist/
+*.tmp
+*.log
+
+# OS generated
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.DS_Store
