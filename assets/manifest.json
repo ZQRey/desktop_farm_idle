@@ -1,0 +1,55 @@
+{
+  "version": "1.0.0",
+  "assets": [
+    {
+      "id": "tractor_classic",
+      "type": "vehicle",
+      "name": "Rusty Classic 25",
+      "scale": 0.16,
+      "pivot": { "x": 0.5, "y": 0.75 },
+      "layers": {
+        "body": "res://assets/vehicles/tractor_classic/body.png",
+        "wheel_rear": {
+          "path": "res://assets/vehicles/tractor_classic/wheel_rear.png",
+          "offset": [-44, 22],
+          "scale": 0.16,
+          "radius": 24
+        },
+        "wheel_front": {
+          "path": "res://assets/vehicles/tractor_classic/wheel_front.png",
+          "offset": [48, 25],
+          "scale": 0.13,
+          "radius": 16
+        },
+        "exhaust": {
+          "offset": [32, -50]
+        },
+        "hitch_rear": {
+          "offset": [-75, 20]
+        }
+      }
+    },
+    {
+      "id": "plow_classic",
+      "type": "equipment",
+      "name": "3-Furrow Moldboard Plow",
+      "scale": 0.14,
+      "path": "res://assets/equipment/plow/plow.png",
+      "hitch_offset": [-10, 10]
+    },
+    {
+      "id": "farm_silo",
+      "type": "building",
+      "name": "Grain Silo",
+      "scale": 0.15,
+      "path": "res://assets/environment/buildings/silo.png"
+    },
+    {
+      "id": "farm_cat",
+      "type": "animal",
+      "name": "Ginger Farm Cat",
+      "scale": 0.08,
+      "path": "res://assets/environment/animals/cat.png"
+    }
+  ]
+}
