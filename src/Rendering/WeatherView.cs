@@ -25,18 +25,18 @@ public partial class WeatherView : Node2D
         // Rain particles
         _rainParticles = new CpuParticles2D
         {
-            Position = new Vector2(960, -20),
+            Position = new Vector2(960, -10),
             EmissionShape = CpuParticles2D.EmissionShapeEnum.Rectangle,
-            EmissionRectExtents = new Vector2(1000, 10),
-            Amount = 120,
-            Lifetime = 0.7f,
+            EmissionRectExtents = new Vector2(1000, 5),
+            Amount = 100,
+            Lifetime = 0.38f,
             Direction = new Vector2(0.2f, 1.0f),
             Spread = 5f,
             Gravity = new Vector2(0, 450f),
             InitialVelocityMin = 280f,
             InitialVelocityMax = 380f,
-            ScaleAmountMin = 1.0f,
-            ScaleAmountMax = 2.0f,
+            ScaleAmountMin = 0.8f,
+            ScaleAmountMax = 1.5f,
             Color = new Color(0.6f, 0.75f, 0.95f, 0.5f),
             Emitting = false
         };
@@ -45,18 +45,18 @@ public partial class WeatherView : Node2D
         // Snow particles
         _snowParticles = new CpuParticles2D
         {
-            Position = new Vector2(960, -20),
+            Position = new Vector2(960, -10),
             EmissionShape = CpuParticles2D.EmissionShapeEnum.Rectangle,
-            EmissionRectExtents = new Vector2(1000, 10),
-            Amount = 70,
-            Lifetime = 2.5f,
+            EmissionRectExtents = new Vector2(1000, 5),
+            Amount = 60,
+            Lifetime = 1.6f,
             Direction = new Vector2(0.3f, 1.0f),
             Spread = 20f,
             Gravity = new Vector2(0, 40f),
             InitialVelocityMin = 30f,
             InitialVelocityMax = 60f,
-            ScaleAmountMin = 2.0f,
-            ScaleAmountMax = 4.0f,
+            ScaleAmountMin = 1.2f,
+            ScaleAmountMax = 2.4f,
             Color = new Color(0.95f, 0.95f, 1.0f, 0.75f),
             Emitting = false
         };
@@ -65,7 +65,7 @@ public partial class WeatherView : Node2D
         // Lightning flash overlay
         _lightningFlash = new ColorRect
         {
-            Size = new Vector2(3840, 240),
+            Size = new Vector2(3840, 120),
             Color = new Color(1, 1, 1, 0),
             MouseFilter = Control.MouseFilterEnum.Ignore
         };

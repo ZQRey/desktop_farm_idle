@@ -29,25 +29,29 @@ public partial class MainOverlay : Node2D
         // 0. Ensure Windows desktop assemblies can resolve
         DesktopFarmIdle.Core.WindowsDesktopResolver.Initialize();
 
+        // 1. Force hardware-transparent clear color and transparent viewport
+        RenderingServer.SetDefaultClearColor(new Color(0, 0, 0, 0));
+        GetTree().Root.TransparentBg = true;
+
         GameLogger.Instance.Info("MainOverlay _Ready starting...", "MainOverlay");
 
-        // 1. Initialize Core Simulation
+        // 2. Initialize Core Simulation
         _simulation = new GameSimulation();
 
-        // 2. Build World Scenery (0 clickable UI controls in desktop world!)
+        // 3. Build World Scenery (Diorama, 0 clickable UI controls in desktop world!)
         BuildScenery();
 
-        // 3. Transient Toast Overlay (Non-persistent, mouse ignore)
+        // 4. Transient Toast Overlay (Non-persistent, mouse ignore)
         _toastOverlay = new OverlayHud();
         _toastOverlay.BindSimulation(_simulation);
         AddChild(_toastOverlay);
 
-        // 4. Standalone Management Window
+        // 5. Standalone Management Window
         _managementWindow = new ManagementWindow();
         _managementWindow.BindSimulation(_simulation);
         AddChild(_managementWindow);
 
-        // 5. Windows Desktop Integration
+        // 6. Windows Desktop Integration
         InitializeWindowsIntegration();
 
         GameLogger.Instance.Info("MainOverlay initialized successfully.", "MainOverlay");
@@ -57,32 +61,22 @@ public partial class MainOverlay : Node2D
     {
         if (_simulation == null) return;
 
-        // Background Silo Building (Far right, sitting on ground line Y=160)
-        var siloTex = GD.Load<Texture2D>("res://assets/environment/buildings/silo.png");
-        var siloSprite = new Sprite2D
-        {
-            Texture = siloTex,
-            Scale = new Vector2(0.12f, 0.12f),
-            Position = new Vector2(1780, 105)
-        };
-        AddChild(siloSprite);
-
         // Weather effects (rain, snow, lightning) across viewport
         _weatherView = new WeatherView();
         _weatherView.BindWeather(_simulation.WeatherSystem);
         AddChild(_weatherView);
 
-        // Field soil & crop renderer (Prominently visible across Y: 150-240)
+        // Field soil & crop renderer (Clean diorama soil surface at Y=85, base at Y=120)
         _fieldRenderer = new FieldRenderer();
         _fieldRenderer.BindField(_simulation.FieldSystem.Fields[0]);
         AddChild(_fieldRenderer);
 
-        // Layered tractor vehicle (Rolling on soil surface at Y=160)
+        // Layered tractor vehicle (Rolling on soil surface at Y=85)
         _vehicleView = new VehicleView();
         _vehicleView.BindVehicle(_simulation.VehicleSystem.Vehicles[0]);
         AddChild(_vehicleView);
 
-        // Cozy ambient farm cat
+        // Cozy ambient farm cat (Walking along soil surface at Y=85)
         _catView = new CatView();
         AddChild(_catView);
     }

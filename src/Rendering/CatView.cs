@@ -12,17 +12,22 @@ public partial class CatView : Node2D
     private float _catX = 1400.0f;
     private float _catDir = -1.0f;
 
+    // Soil surface line in 120px overlay diorama
+    private const float GroundY = 85.0f;
+    // Cat center Y (height is ~18px, center is 9px above feet)
+    private const float CatCenterY = GroundY - 9.0f;
+
     public override void _Ready()
     {
         var catTex = GD.Load<Texture2D>("res://assets/environment/animals/cat.png");
         _catSprite = new Sprite2D
         {
             Texture = catTex,
-            Scale = new Vector2(0.08f, 0.08f),
+            Scale = new Vector2(0.038f, 0.038f),
             Position = new Vector2(0, 0)
         };
         AddChild(_catSprite);
-        Position = new Vector2(_catX, 156.0f);
+        Position = new Vector2(_catX, CatCenterY);
     }
 
     public override void _Process(double delta)
@@ -32,7 +37,6 @@ public partial class CatView : Node2D
 
         if (_actionTimer <= 0f)
         {
-            // Switch state
             var rnd = new Random();
             _catState = rnd.Next(3);
             _actionTimer = 4.0f + (float)rnd.NextDouble() * 8.0f;
@@ -42,22 +46,22 @@ public partial class CatView : Node2D
             }
         }
 
-        if (_catState == 0) // Walk
+        if (_catState == 0) // Walking along farm field
         {
             _walkTimer += dt * 8.0f;
-            _catX += _catDir * 18.0f * dt;
-            _catX = Math.Clamp(_catX, 300.0f, 1700.0f);
+            _catX += _catDir * 16.0f * dt;
+            _catX = Math.Clamp(_catX, 200.0f, 1750.0f);
 
-            Position = new Vector2(_catX, 156.0f + MathF.Sin(_walkTimer) * 1.0f);
+            Position = new Vector2(_catX, CatCenterY + MathF.Sin(_walkTimer) * 0.6f);
             Scale = new Vector2(_catDir > 0 ? -1.0f : 1.0f, 1.0f);
         }
-        else if (_catState == 1) // Watch tractor
+        else if (_catState == 1) // Sitting and watching the field
         {
-            Position = new Vector2(_catX, 156.0f);
+            Position = new Vector2(_catX, CatCenterY);
         }
-        else // Resting
+        else // Resting/napping
         {
-            Position = new Vector2(_catX, 157.0f);
+            Position = new Vector2(_catX, CatCenterY + 1.0f);
         }
     }
 }

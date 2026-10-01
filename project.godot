@@ -18,7 +18,7 @@ config/icon="res://icon.svg"
 [display]
 
 window/size/viewport_width=1920
-window/size/viewport_height=240
+window/size/viewport_height=120
 window/size/borderless=true
 window/size/transparent=true
 window/subwindows/embed_subwindows=false
@@ -32,4 +32,5 @@ project/assembly_name="DesktopFarmIdle"
 
 [rendering]
 
+environment/defaults/default_clear_color=Color(0, 0, 0, 0)
 viewport/transparent_background=true

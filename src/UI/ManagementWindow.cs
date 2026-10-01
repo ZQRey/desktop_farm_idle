@@ -226,13 +226,47 @@ public partial class ManagementWindow : Window
     {
         var settings = new VBoxContainer { Name = "⚙️ Настройки" };
 
+        // 1. Preset Farm Sizes (Compact 90px, Normal 120px, Large 160px)
+        var lblSize = new Label { Text = "Размер фермы (Diorama Size):" };
+        settings.AddChild(lblSize);
+
+        var rowPresets = new HBoxContainer();
+        var btnCompact = new Button { Text = "Компактный (90 px)" };
+        btnCompact.Pressed += () =>
+        {
+            WindowsOverlayService.Instance.ConfiguredLogicalHeight = 90;
+            if (_spinHeight != null) _spinHeight.Value = 90;
+            WindowsOverlayService.Instance.PositionOverlayAboveTaskbar();
+        };
+        rowPresets.AddChild(btnCompact);
+
+        var btnNormal = new Button { Text = "Обычный (120 px) [Рекомендуется]" };
+        btnNormal.Pressed += () =>
+        {
+            WindowsOverlayService.Instance.ConfiguredLogicalHeight = 120;
+            if (_spinHeight != null) _spinHeight.Value = 120;
+            WindowsOverlayService.Instance.PositionOverlayAboveTaskbar();
+        };
+        rowPresets.AddChild(btnNormal);
+
+        var btnLarge = new Button { Text = "Крупный (160 px)" };
+        btnLarge.Pressed += () =>
+        {
+            WindowsOverlayService.Instance.ConfiguredLogicalHeight = 160;
+            if (_spinHeight != null) _spinHeight.Value = 160;
+            WindowsOverlayService.Instance.PositionOverlayAboveTaskbar();
+        };
+        rowPresets.AddChild(btnLarge);
+        settings.AddChild(rowPresets);
+
+        // 2. Exact Custom Height
         var rowHeight = new HBoxContainer();
-        rowHeight.AddChild(new Label { Text = "Высота оверлея (px): " });
+        rowHeight.AddChild(new Label { Text = "Точная высота (px): " });
         _spinHeight = new SpinBox
         {
-            MinValue = 180,
-            MaxValue = 400,
-            Step = 10,
+            MinValue = 80,
+            MaxValue = 220,
+            Step = 5,
             Value = WindowsOverlayService.Instance.ConfiguredLogicalHeight
         };
         _spinHeight.ValueChanged += val =>
@@ -243,13 +277,36 @@ public partial class ManagementWindow : Window
         rowHeight.AddChild(_spinHeight);
         settings.AddChild(rowHeight);
 
-        var chkInteractive = new CheckBox { Text = "Интерактивный режим (принимать клики мышью)" };
+        // 3. Bottom Offset (Raise above taskbar)
+        var rowOffset = new HBoxContainer();
+        rowOffset.AddChild(new Label { Text = "Отступ от панели задач снизу (px): " });
+        var spinOffset = new SpinBox
+        {
+            MinValue = 0,
+            MaxValue = 100,
+            Step = 5,
+            Value = WindowsOverlayService.Instance.BottomOffset
+        };
+        spinOffset.ValueChanged += val =>
+        {
+            WindowsOverlayService.Instance.BottomOffset = (int)val;
+            WindowsOverlayService.Instance.PositionOverlayAboveTaskbar();
+        };
+        rowOffset.AddChild(spinOffset);
+        settings.AddChild(rowOffset);
+
+        // 4. Interactive Mode
+        var chkInteractive = new CheckBox { Text = "Интерактивный режим (принимать клики мыши сквозь окно)" };
         chkInteractive.ButtonPressed = WindowsOverlayService.Instance.IsInteractive;
         chkInteractive.Toggled += val =>
         {
             WindowsOverlayService.Instance.SetInteractiveMode(val);
         };
         settings.AddChild(chkInteractive);
+
+        // 5. Monitor Info
+        var lblMonitor = new Label { Text = "🖥️ Дисплей: Основной монитор Windows (Primary Display)" };
+        settings.AddChild(lblMonitor);
 
         _tabs?.AddChild(settings);
     }

@@ -21,6 +21,10 @@ public partial class VehicleView : Node2D
     private float _suspensionTimer = 0f;
     private float _lastPositionX = 0f;
 
+    // Physical wheel radii in logical pixels
+    private const float RearRadius = 21.0f;
+    private const float FrontRadius = 14.0f;
+
     public void BindVehicle(VehicleModel vehicle)
     {
         _vehicle = vehicle;
@@ -30,81 +34,81 @@ public partial class VehicleView : Node2D
 
     private void BuildVehicleLayers()
     {
-        // Load textures
+        // Load clean alpha textures (0 checkerboard, true RGBA)
         var bodyTex = GD.Load<Texture2D>("res://assets/vehicles/tractor_classic/body.png");
         var rearWheelTex = GD.Load<Texture2D>("res://assets/vehicles/tractor_classic/wheel_rear.png");
         var frontWheelTex = GD.Load<Texture2D>("res://assets/vehicles/tractor_classic/wheel_front.png");
-        var plowTex = GD.Load<Texture2D>("res://assets/equipment/plow/plow.png");
+        var plowTex = GD.Load<Texture2D>("res://assets/vehicles/tractor_classic/plow.png");
 
-        // Attached Equipment (Plow) - behind tractor
+        // 1. Attached Equipment (Plow) - behind tractor
         _plowSprite = new Sprite2D
         {
             Texture = plowTex,
-            Scale = new Vector2(0.12f, 0.12f),
-            Position = new Vector2(-75, 12),
+            Scale = new Vector2(0.045f, 0.045f),
+            Position = new Vector2(-44, -12),
             Visible = true
         };
         AddChild(_plowSprite);
 
-        // Rear Wheel
+        // 2. Rear Wheel (Large drive wheel, rests on ground line Y=0)
         _rearWheelSprite = new Sprite2D
         {
             Texture = rearWheelTex,
-            Scale = new Vector2(0.14f, 0.14f),
-            Position = new Vector2(-36, 18)
+            Scale = new Vector2(0.046f, 0.046f),
+            Position = new Vector2(-20, -RearRadius)
         };
         AddChild(_rearWheelSprite);
 
-        // Front Wheel
+        // 3. Front Wheel (Steering wheel, rests on ground line Y=0)
         _frontWheelSprite = new Sprite2D
         {
             Texture = frontWheelTex,
-            Scale = new Vector2(0.11f, 0.11f),
-            Position = new Vector2(50, 24)
+            Scale = new Vector2(0.033f, 0.033f),
+            Position = new Vector2(26, -FrontRadius)
         };
         AddChild(_frontWheelSprite);
 
-        // Chassis Body
+        // 4. Chassis Body (Cabin, hood, engine)
         _bodySprite = new Sprite2D
         {
             Texture = bodyTex,
-            Scale = new Vector2(0.14f, 0.14f),
-            Position = new Vector2(0, 0)
+            Scale = new Vector2(0.070f, 0.070f),
+            Position = new Vector2(0, -28)
         };
         AddChild(_bodySprite);
 
-        // Exhaust Particles
+        // 5. Exhaust Smoke Particles (Scaled to tiny diorama proportions)
         _exhaustParticles = new CpuParticles2D
         {
-            Position = new Vector2(28, -48),
-            Amount = 14,
-            Lifetime = 0.8f,
+            Position = new Vector2(14, -48),
+            Amount = 10,
+            Lifetime = 0.6f,
             Direction = new Vector2(0.3f, -1.0f),
-            Spread = 25f,
-            Gravity = new Vector2(0, -20f),
-            InitialVelocityMin = 25f,
-            InitialVelocityMax = 50f,
-            ScaleAmountMin = 2.5f,
-            ScaleAmountMax = 6.0f,
-            Color = new Color(0.3f, 0.3f, 0.3f, 0.5f),
+            Spread = 20f,
+            Gravity = new Vector2(0, -15f),
+            InitialVelocityMin = 15f,
+            InitialVelocityMax = 30f,
+            ScaleAmountMin = 0.8f,
+            ScaleAmountMax = 2.2f,
+            Color = new Color(0.35f, 0.35f, 0.35f, 0.45f),
             Emitting = true
         };
         AddChild(_exhaustParticles);
 
-        // Furrow Soil Clods Particles (under plow)
+        // 6. Furrow Soil Clods Particles (Ejected from plow when tilling)
         _furrowParticles = new CpuParticles2D
         {
-            Position = new Vector2(-80, 20),
-            Amount = 18,
-            Lifetime = 0.5f,
+            Position = new Vector2(-46, -2),
+            Amount = 12,
+            Lifetime = 0.35f,
             Direction = new Vector2(-1.0f, -0.6f),
-            Spread = 35f,
-            Gravity = new Vector2(0, 180f),
-            InitialVelocityMin = 30f,
-            InitialVelocityMax = 65f,
-            ScaleAmountMin = 2.0f,
-            ScaleAmountMax = 4.5f,
-            Color = new Color(0.28f, 0.18f, 0.10f, 0.9f),
+            Spread = 25f,
+            Gravity = new Vector2(0, 140f),
+            InitialVelocityMin = 20f,
+            InitialVelocityMax = 45f,
+            ScaleAmountMin = 0.8f,
+            ScaleAmountMax = 1.6f,
+            Color = new Color(0.24f, 0.15f, 0.09f, 0.85f),
             Emitting = false
         };
         AddChild(_furrowParticles);
@@ -119,61 +123,48 @@ public partial class VehicleView : Node2D
         float dx = currentX - _lastPositionX;
         _lastPositionX = currentX;
 
-        // Position on field (ground line is around y=160, wheels touch earth)
-        Position = new Vector2(currentX, 138.0f);
+        // Position on field: Soil surface is at Y=85.0f, vehicle base touches ground at Y=85
+        Position = new Vector2(currentX, 85.0f);
 
         // Flip orientation based on movement direction
         Scale = new Vector2(_vehicle.MoveDirection > 0 ? 1.0f : -1.0f, 1.0f);
 
-        // Suspension bounce when moving
+        // Suspension bounce and wheel rotation when moving
         bool isMoving = MathF.Abs(dx) > 0.001f && !_vehicle.IsBroken;
         if (isMoving)
         {
             _suspensionTimer += dt * 14.0f;
-            float bounceY = MathF.Sin(_suspensionTimer) * 1.5f;
+            float bounceY = MathF.Sin(_suspensionTimer) * 0.8f;
             if (_bodySprite != null)
-                _bodySprite.Position = new Vector2(0, bounceY);
+                _bodySprite.Position = new Vector2(0, -28 + bounceY);
 
-            // Wheel rotation physics
-            float rearRadius = 22.0f;
-            float frontRadius = 15.0f;
-
-            _rearWheelRotation += (dx / rearRadius) * _vehicle.MoveDirection;
-            _frontWheelRotation += (dx / frontRadius) * _vehicle.MoveDirection;
+            // Wheel rotation physics based on traveled distance and wheel radius
+            _rearWheelRotation += (dx / RearRadius) * _vehicle.MoveDirection;
+            _frontWheelRotation += (dx / FrontRadius) * _vehicle.MoveDirection;
 
             if (_rearWheelSprite != null) _rearWheelSprite.Rotation = _rearWheelRotation;
             if (_frontWheelSprite != null) _frontWheelSprite.Rotation = _frontWheelRotation;
         }
 
-        // Equipment positioning: Lower when working, lift when turning or idle
+        // Equipment positioning: Lower when actively working, lift when traveling/turning
         if (_plowSprite != null)
         {
-            _plowSprite.Visible = _vehicle.AttachedEquipment == EquipmentType.Plow;
-            float targetPlowY = _vehicle.IsWorking ? 16.0f : 4.0f; // Lowered into ground vs lifted
-            _plowSprite.Position = new Vector2(-75, Mathf.Lerp(_plowSprite.Position.Y, targetPlowY, dt * 6.0f));
-            _plowSprite.Rotation = Mathf.Lerp(_plowSprite.Rotation, _vehicle.IsWorking ? 0.05f : -0.18f, dt * 6.0f);
+            bool isPlowing = _vehicle.IsWorking && (_vehicle.CurrentTask is VehicleTaskType.Plowing or VehicleTaskType.Cultivating);
+            float targetY = isPlowing ? -10.0f : -16.0f;
+            _plowSprite.Position = new Vector2(-44, Mathf.Lerp(_plowSprite.Position.Y, targetY, dt * 6.0f));
+
+            if (_furrowParticles != null)
+            {
+                _furrowParticles.Emitting = isPlowing && isMoving;
+            }
         }
 
-        // Soil furrow particles active only when plowing and moving
-        if (_furrowParticles != null)
-        {
-            _furrowParticles.Emitting = _vehicle.IsWorking && _vehicle.CurrentTask == VehicleTaskType.Plowing && isMoving;
-        }
-
-        // Exhaust smoke: darker & more frequent under load
+        // Exhaust smoke: Puffs faster when working under engine load
         if (_exhaustParticles != null)
         {
-            _exhaustParticles.Emitting = !_vehicle.IsBroken;
-            if (_vehicle.IsWorking)
-            {
-                _exhaustParticles.Amount = 24;
-                _exhaustParticles.Color = new Color(0.25f, 0.25f, 0.25f, 0.65f);
-            }
-            else
-            {
-                _exhaustParticles.Amount = 10;
-                _exhaustParticles.Color = new Color(0.55f, 0.55f, 0.55f, 0.35f);
-            }
+            bool isWorking = _vehicle.IsWorking;
+            _exhaustParticles.Amount = isWorking ? 14 : 8;
+            _exhaustParticles.InitialVelocityMax = isWorking ? 36f : 22f;
         }
     }
 }

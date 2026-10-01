@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Windows.Forms;
 using DesktopFarmIdle.Core.Logging;
 
 namespace DesktopFarmIdle.DesktopIntegration;
@@ -38,6 +37,9 @@ public class WindowsOverlayService
     public const int SW_SHOW = 5;
     public const int SW_SHOWNA = 8;
 
+    public const uint MONITOR_DEFAULTTOPRIMARY = 0x00000001;
+    public const uint MONITOR_DEFAULTTONEAREST = 0x00000002;
+
     [StructLayout(LayoutKind.Sequential)]
     public struct RECT
     {
@@ -50,6 +52,24 @@ public class WindowsOverlayService
         public int Height => Bottom - Top;
 
         public override string ToString() => $"[{Left},{Top} -> {Right},{Bottom} ({Width}x{Height})]";
+    }
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+    public struct MONITORINFO
+    {
+        public int cbSize;
+        public RECT rcMonitor;
+        public RECT rcWork;
+        public int dwFlags;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct MARGINS
+    {
+        public int cxLeftWidth;
+        public int cxRightWidth;
+        public int cyTopHeight;
+        public int cyBottomHeight;
     }
 
     #endregion
@@ -77,11 +97,21 @@ public class WindowsOverlayService
     [DllImport("user32.dll")]
     public static extern int GetDpiForSystem();
 
+    [DllImport("user32.dll")]
+    public static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint dwFlags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    public static extern bool GetMonitorInfo(IntPtr hMonitor, ref MONITORINFO lpmi);
+
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmExtendFrameIntoClientArea(IntPtr hWnd, ref MARGINS pMarInset);
+
     #endregion
 
     private IntPtr _hwnd = IntPtr.Zero;
     public bool IsInteractive { get; private set; } = false;
-    public int ConfiguredLogicalHeight { get; set; } = 240;
+    public int ConfiguredLogicalHeight { get; set; } = 120; // Default diorama height: 120 px
+    public int BottomOffset { get; set; } = 0; // Configurable bottom margin (0-100px)
 
     public IntPtr HWnd => _hwnd;
 
@@ -116,11 +146,17 @@ public class WindowsOverlayService
 
         try
         {
+            // 1. Extend DWM frame for true hardware-accelerated desktop transparency
+            MARGINS margins = new MARGINS { cxLeftWidth = -1, cxRightWidth = -1, cyTopHeight = -1, cyBottomHeight = -1 };
+            int hr = DwmExtendFrameIntoClientArea(_hwnd, ref margins);
+            if (hr != 0)
+            {
+                GameLogger.Instance.Warning($"DwmExtendFrameIntoClientArea returned HRESULT 0x{hr:X}", "WindowsOverlayService");
+            }
+
+            // 2. Configure Win32 Extended Window Styles
             IntPtr currentExStyle = GetWindowLongPtr(_hwnd, GWL_EXSTYLE);
             long ex = currentExStyle.ToInt64();
-
-            // Hide window momentarily to force Windows Shell to delete taskbar button
-            ShowWindow(_hwnd, SW_HIDE);
 
             // Add WS_EX_TOOLWINDOW (hides from taskbar and Alt+Tab)
             // Add WS_EX_LAYERED, WS_EX_NOACTIVATE
@@ -132,23 +168,22 @@ public class WindowsOverlayService
 
             if (!IsInteractive)
             {
-                ex |= WS_EX_TRANSPARENT; // Click-through
+                ex |= WS_EX_TRANSPARENT; // Click-through enabled
             }
             else
             {
-                ex &= ~WS_EX_TRANSPARENT; // Interactive
+                ex &= ~WS_EX_TRANSPARENT; // Interactive mode
             }
 
             SetWindowLongPtr(_hwnd, GWL_EXSTYLE, new IntPtr(ex));
 
-            // Restore window without activating it
-            ShowWindow(_hwnd, SW_SHOWNA);
-
-            // Z-Order: Use HWND_NOTOPMOST or HWND_BOTTOM so regular applications can cover it
+            // Z-Order: Use HWND_NOTOPMOST so regular applications can cover it, but desktop shows it
             SetWindowPos(_hwnd, HWND_NOTOPMOST, 0, 0, 0, 0,
                 SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE | SWP_FRAMECHANGED);
 
-            GameLogger.Instance.Info($"Applied Window Styles. ClickThrough: {!IsInteractive}, ToolWindow: True", "WindowsOverlayService");
+            ShowWindow(_hwnd, SW_SHOWNA);
+
+            GameLogger.Instance.Info($"Applied Window Styles. ClickThrough: {!IsInteractive}, ToolWindow: True, Height: {ConfiguredLogicalHeight}", "WindowsOverlayService");
         }
         catch (Exception ex)
         {
@@ -156,12 +191,42 @@ public class WindowsOverlayService
         }
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct POINT
+    {
+        public int x;
+        public int y;
+    }
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr MonitorFromPoint(POINT pt, uint dwFlags);
+
+    public int TargetMonitorIndex { get; set; } = 0; // 0 = Primary Monitor
+
     public (int x, int y, int width, int height) CalculateOverlayBounds()
     {
-        // Use primary screen for the main overlay
-        var screen = Screen.PrimaryScreen ?? Screen.AllScreens[0];
-        var monitor = screen.Bounds;
-        var work = screen.WorkingArea;
+        // Pure Win32 monitor & work area resolution (zero WinForms dependency)
+        MONITORINFO mi = new MONITORINFO();
+        mi.cbSize = Marshal.SizeOf(typeof(MONITORINFO));
+
+        // Primary monitor is guaranteed at point (0, 0)
+        IntPtr hMonitor = TargetMonitorIndex == 0
+            ? MonitorFromPoint(new POINT { x = 0, y = 0 }, MONITOR_DEFAULTTOPRIMARY)
+            : MonitorFromWindow(_hwnd != IntPtr.Zero ? _hwnd : IntPtr.Zero, MONITOR_DEFAULTTOPRIMARY);
+
+        RECT monitor;
+        RECT work;
+
+        if (GetMonitorInfo(hMonitor, ref mi))
+        {
+            monitor = mi.rcMonitor;
+            work = mi.rcWork;
+        }
+        else
+        {
+            monitor = new RECT { Left = 0, Top = 0, Right = 1920, Bottom = 1080 };
+            work = new RECT { Left = 0, Top = 0, Right = 1920, Bottom = 1040 };
+        }
 
         uint dpi = 96;
         if (_hwnd != IntPtr.Zero)
@@ -184,18 +249,18 @@ public class WindowsOverlayService
         // Inferred taskbar position
         if (work.Bottom < monitor.Bottom)
         {
-            // Taskbar is at bottom: overlay sits directly above taskbar
-            y = work.Bottom - height;
+            // Taskbar is at bottom: overlay sits directly above taskbar, accounting for BottomOffset
+            y = work.Bottom - height - BottomOffset;
         }
         else if (work.Top > monitor.Top)
         {
             // Taskbar is at top
-            y = monitor.Bottom - height;
+            y = monitor.Bottom - height - BottomOffset;
         }
         else
         {
             // Left or right taskbar
-            y = work.Bottom - height;
+            y = work.Bottom - height - BottomOffset;
         }
 
         string taskbarPos = work.Bottom < monitor.Bottom ? "Bottom" :
@@ -211,6 +276,7 @@ public class WindowsOverlayService
             $"  Inferred Taskbar: {taskbarPos}\n" +
             $"  Overlay Logical Height: {ConfiguredLogicalHeight}px\n" +
             $"  Overlay Physical Height: {physicalHeight}px\n" +
+            $"  Bottom Offset: {BottomOffset}px\n" +
             $"  Calculated Overlay Bounds: X={x}, Y={y}, W={width}, H={height}",
             "WindowsOverlayService"
         );
